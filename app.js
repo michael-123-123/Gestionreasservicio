@@ -20,6 +20,9 @@
 //    de la unidad en los rankings de mayor generación.
 // 4. (CORREGIDO) No se mostraba correctamente la subcategoría de especiales en
 //    el informe, se añade gráfico para mayor visibilidad.
+// 5. (CORRECCIÓN TÉCNICA) Se eliminó una asignación global innecesaria de `window.supabase`
+//    que podía generar conflictos. La gestión de clientes de BBDD ya se maneja
+//    correctamente a través de la lógica de la aplicación.
 // =================================================================================
 
 
@@ -39,7 +42,6 @@ const supabaseClients = {
     sst: { client: supabaseSST, name: 'SST' },
     hpl: { client: supabaseHPL, name: 'HPL' }
 };
-window.supabase = supabaseSST;
 
 // ---------------------------------------------------------------------------------
 // PARTE 2: ESTADO GLOBAL DE LA APLICACIÓN Y CACHÉ
