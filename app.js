@@ -1,28 +1,14 @@
 // =================================================================================
 // GESTIÓNPRO - SCRIPT CENTRAL MULTI-ESTABLECIMIENTO (APP.JS)
-// Versión 28.0: Gráficos de Informe Mejorados y Detalle de Establecimiento.
-//
-// DESCRIPCIÓN:
-// Esta versión introduce gráficos detallados en los informes de establecimiento para
-// Residuos Asimilables (RSAD) y subcategorías de Residuos Especiales. Además,
-// en la vista de administrador, el resumen ejecutivo ahora especifica el hospital
-// de las unidades con mayor generación.
+// Versión 28.2: Aislamiento de Clientes Supabase para Producción.
 //
 // CAMBIOS:
-// 1. (NUEVO) Gráfico de RSAD por Unidad: El informe de establecimiento ahora
-//    incluye un gráfico de barras que muestra las unidades que más residuos
-//    asimilables generan.
-// 2. (NUEVO) Gráfico de Tendencia de R. Especiales: Se añade un gráfico de
-//    barras apiladas para visualizar la evolución mensual de cada subcategoría
-//    de residuo especial en el informe.
-// 3. (MEJORADO) Detalle de Hospital en Resumen: El resumen ejecutivo del informe
-//    consolidado (admin) ahora muestra el nombre del hospital junto al nombre
-//    de la unidad en los rankings de mayor generación.
-// 4. (CORREGIDO) No se mostraba correctamente la subcategoría de especiales en
-//    el informe, se añade gráfico para mayor visibilidad.
-// 5. (CORRECCIÓN TÉCNICA) Se eliminó una asignación global innecesaria de `window.supabase`
-//    que podía generar conflictos. La gestión de clientes de BBDD ya se maneja
-//    correctamente a través de la lógica de la aplicación.
+// 1. (CORRECCIÓN CRÍTICA) Se ha solucionado el problema por el cual solo una base de
+//    datos funcionaba en Vercel. Se asignaron `storageKey` únicas a cada cliente
+//    de Supabase para evitar conflictos en el almacenamiento del navegador,
+//    resolviendo la advertencia de "Multiple GoTrueClient instances".
+// 2. (MANTENIDO) Se conservan los registros de error detallados para facilitar
+//    futuras depuraciones.
 // =================================================================================
 
 
@@ -32,11 +18,18 @@
 
 const SUPABASE_URL_SST = 'https://mddxfoldoxtofjvevmfg.supabase.co';
 const SUPABASE_ANON_KEY_SST = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZHhmb2xkb3h0b2ZqdmV2bWZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3ODY3NjQsImV4cCI6MjA3MTM2Mjc2NH0.qgWe16qCy42PpvM10xZDT2Nxzvv3VL-rI4xyZjxROEg';
-const supabaseSST = window.supabase.createClient(SUPABASE_URL_SST, SUPABASE_ANON_KEY_SST);
+// Se añade una storageKey única para el cliente SST
+const supabaseSST = window.supabase.createClient(SUPABASE_URL_SST, SUPABASE_ANON_KEY_SST, {
+    auth: { storageKey: 'supabase.auth.token.sst' }
+});
 
 const SUPABASE_URL_HPL = 'https://awnyfetnjoaffqchaofv.supabase.co';
 const SUPABASE_ANON_KEY_HPL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF3bnlmZXRuam9hZmZxY2hhb2Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NjA5MzAsImV4cCI6MjA2NTMzNjkzMH0.uV_rSurPAEg79d-czQq7qL3FfnNJhoYxMJ20JyDYNog';
-const supabaseHPL = window.supabase.createClient(SUPABASE_URL_HPL, SUPABASE_ANON_KEY_HPL);
+// Se añade una storageKey única para el cliente HPL
+const supabaseHPL = window.supabase.createClient(SUPABASE_URL_HPL, SUPABASE_ANON_KEY_HPL, {
+    auth: { storageKey: 'supabase.auth.token.hpl' }
+});
+
 
 const supabaseClients = {
     sst: { client: supabaseSST, name: 'SST' },
@@ -98,6 +91,7 @@ const Auth = {
                 if (insertError) throw new Error("Failed to create user profile: " + insertError.message);
                 return this.fetchUserProfile();
             } else {
+                console.error("Failed to fetch user profile, Supabase error:", error);
                 throw new Error("Failed to fetch user profile: " + error.message);
             }
         }
@@ -129,7 +123,7 @@ const Auth = {
         try {
             return await this.fetchUserProfile();
         } catch (error) {
-            console.error("Authentication check failed:", error.message);
+            console.error("Authentication check failed:", error.message, error);
             if (!window.location.pathname.endsWith('/login.html')) {
                 window.location.href = 'login.html';
             }
@@ -706,6 +700,7 @@ async function loadAndRenderList(tableName, page = 0, filters = {}) {
         }
 
         if (error && data.length === 0) {
+            console.error(`Failed to load data for ${tableName}. Supabase error:`, error);
             listContainer.innerHTML = `<tr><td colspan="100%" class="text-center p-4 text-red-500">Error: ${error.message}.</td></tr>`;
             return;
         }
@@ -3659,3 +3654,4 @@ function loadTabContent(tabName) {
         contentArea.innerHTML = `<div class="text-center p-10"><h2 class="text-xl font-semibold">Módulo '${tabName}' en construcción.</h2></div>`;
     }
 }
+
