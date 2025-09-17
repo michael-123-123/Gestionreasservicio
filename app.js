@@ -1,14 +1,25 @@
 // =================================================================================
 // GESTIÓNPRO - SCRIPT CENTRAL MULTI-ESTABLECIMIENTO (APP.JS)
-// Versión 28.3: Lógica de Autenticación Reforzada y Aislamiento de Sesiones.
+// Versión 28.0: Gráficos de Informe Mejorados y Detalle de Establecimiento.
+//
+// DESCRIPCIÓN:
+// Esta versión introduce gráficos detallados en los informes de establecimiento para
+// Residuos Asimilables (RSAD) y subcategorías de Residuos Especiales. Además,
+// en la vista de administrador, el resumen ejecutivo ahora especifica el hospital
+// de las unidades con mayor generación.
 //
 // CAMBIOS:
-// 1. (CORRECCIÓN CRÍTICA) Se ha añadido una lógica para forzar el cierre de sesión
-//    en el cliente de HPL cada vez que se inicia o se restaura una sesión en SST.
-//    Esto previene cualquier conflicto de sesión entre las dos bases de datos,
-//    asegurando que HPL solo se use para obtener datos de forma anónima.
-// 2. (MANTENIDO) Se conservan las `storageKey` únicas para cada cliente como una
-//    buena práctica de aislamiento.
+// 1. (NUEVO) Gráfico de RSAD por Unidad: El informe de establecimiento ahora
+//    incluye un gráfico de barras que muestra las unidades que más residuos
+//    asimilables generan.
+// 2. (NUEVO) Gráfico de Tendencia de R. Especiales: Se añade un gráfico de
+//    barras apiladas para visualizar la evolución mensual de cada subcategoría
+//    de residuo especial en el informe.
+// 3. (MEJORADO) Detalle de Hospital en Resumen: El resumen ejecutivo del informe
+//    consolidado (admin) ahora muestra el nombre del hospital junto al nombre
+//    de la unidad en los rankings de mayor generación.
+// 4. (CORREGIDO) No se mostraba correctamente la subcategoría de especiales en
+//    el informe, se añade gráfico para mayor visibilidad.
 // =================================================================================
 
 
@@ -18,23 +29,17 @@
 
 const SUPABASE_URL_SST = 'https://mddxfoldoxtofjvevmfg.supabase.co';
 const SUPABASE_ANON_KEY_SST = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZHhmb2xkb3h0b2ZqdmV2bWZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3ODY3NjQsImV4cCI6MjA3MTM2Mjc2NH0.qgWe16qCy42PpvM10xZDT2Nxzvv3VL-rI4xyZjxROEg';
-// Se añade una storageKey única para el cliente SST
-const supabaseSST = window.supabase.createClient(SUPABASE_URL_SST, SUPABASE_ANON_KEY_SST, {
-    auth: { storageKey: 'supabase.auth.token.sst' }
-});
+const supabaseSST = window.supabase.createClient(SUPABASE_URL_SST, SUPABASE_ANON_KEY_SST);
 
 const SUPABASE_URL_HPL = 'https://awnyfetnjoaffqchaofv.supabase.co';
 const SUPABASE_ANON_KEY_HPL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF3bnlmZXRuam9hZmZxY2hhb2Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NjA5MzAsImV4cCI6MjA2NTMzNjkzMH0.uV_rSurPAEg79d-czQq7qL3FfnNJhoYxMJ20JyDYNog';
-// Se añade una storageKey única para el cliente HPL
-const supabaseHPL = window.supabase.createClient(SUPABASE_URL_HPL, SUPABASE_ANON_KEY_HPL, {
-    auth: { storageKey: 'supabase.auth.token.hpl' }
-});
-
+const supabaseHPL = window.supabase.createClient(SUPABASE_URL_HPL, SUPABASE_ANON_KEY_HPL);
 
 const supabaseClients = {
     sst: { client: supabaseSST, name: 'SST' },
     hpl: { client: supabaseHPL, name: 'HPL' }
 };
+window.supabase = supabaseSST;
 
 // ---------------------------------------------------------------------------------
 // PARTE 2: ESTADO GLOBAL DE LA APLICACIÓN Y CACHÉ
@@ -64,18 +69,12 @@ const Auth = {
         return null;
     },
     async signIn(credentials) {
-        const { data, error } = await supabaseSST.auth.signInWithPassword(credentials);
-        if (!error && data.session) {
-            // Aseguramos que no haya ninguna sesión activa en el cliente HPL
-            await supabaseHPL.auth.signOut().catch(err => console.error("Error signing out HPL client:", err));
-            window.location.href = 'index.html';
-        }
+        const { error } = await supabaseSST.auth.signInWithPassword(credentials);
+        if (!error) window.location.href = 'index.html';
         return error;
     },
     async signOut() {
         await supabaseSST.auth.signOut();
-        // También cerramos sesión en HPL por si acaso
-        await supabaseHPL.auth.signOut().catch(err => console.error("Error signing out HPL client:", err));
         window.location.href = 'login.html';
     },
     async fetchUserProfile() {
@@ -97,7 +96,6 @@ const Auth = {
                 if (insertError) throw new Error("Failed to create user profile: " + insertError.message);
                 return this.fetchUserProfile();
             } else {
-                console.error("Failed to fetch user profile, Supabase error:", error);
                 throw new Error("Failed to fetch user profile: " + error.message);
             }
         }
@@ -127,14 +125,9 @@ const Auth = {
     },
     async checkAuth() {
         try {
-            const profile = await this.fetchUserProfile();
-             if (profile) {
-                // Aseguramos que no haya ninguna sesión activa en el cliente HPL al restaurar la sesión
-                await supabaseHPL.auth.signOut().catch(err => console.error("Error signing out HPL client on check:", err));
-            }
-            return profile;
+            return await this.fetchUserProfile();
         } catch (error) {
-            console.error("Authentication check failed:", error.message, error);
+            console.error("Authentication check failed:", error.message);
             if (!window.location.pathname.endsWith('/login.html')) {
                 window.location.href = 'login.html';
             }
@@ -711,7 +704,6 @@ async function loadAndRenderList(tableName, page = 0, filters = {}) {
         }
 
         if (error && data.length === 0) {
-            console.error(`Failed to load data for ${tableName}. Supabase error:`, error);
             listContainer.innerHTML = `<tr><td colspan="100%" class="text-center p-4 text-red-500">Error: ${error.message}.</td></tr>`;
             return;
         }
@@ -1666,17 +1658,6 @@ window.APP_MODULES.dashboard = (() => {
         const periodTotals = sumWasteValues(currentGroup);
         const previousPeriodTotals = sumWasteValues(previousGroup);
 
-        const allSpecialKeys = new Set([
-            ...Object.keys(window.APP_CONFIG.wasteTypeOptions.special_waste_categories),
-            ...Object.keys(currentGroup.special),
-            ...Object.keys(previousGroup.special)
-        ]);
-
-        const allHazardousKeys = new Set([
-            ...Object.keys(currentGroup.hazardous),
-            ...Object.keys(previousGroup.hazardous)
-        ]);
-
         const monthlyAnalysis = monthlyDataPackage.data.map((monthData, index) => {
             const groupedMonth = groupWaste(monthData);
             const monthTotals = sumWasteValues(groupedMonth);
@@ -1880,7 +1861,7 @@ window.APP_MODULES.dashboard = (() => {
             rsadByUnit: Object.values(currentGroup.byUnit.assimilable || {})
                 .filter(d => d.kg > 0)
                 .sort((a, b) => b.kg - a.kg),
-            specialSubcategories: Array.from(allSpecialKeys).map(cat => {
+            specialSubcategories: Object.keys(window.APP_CONFIG.wasteTypeOptions.special_waste_categories).map(cat => {
                 const periodKg = currentGroup.special[cat] || 0;
                 const previousKg = previousGroup.special[cat] || 0;
                 return {
@@ -1891,8 +1872,7 @@ window.APP_MODULES.dashboard = (() => {
                     percentage: periodTotals.special > 0 ? (periodKg / periodTotals.special) * 100 : 0
                 };
             }).sort((a, b) => b.period - a.period),
-            hazardousSubcategories: Array.from(allHazardousKeys).map(type => {
-                const kg = currentGroup.hazardous[type] || 0;
+            hazardousSubcategories: Object.entries(currentGroup.hazardous).map(([type, kg]) => {
                 const previousKg = previousGroup.hazardous[type] || 0;
                 return {
                     category: type,
@@ -1901,7 +1881,7 @@ window.APP_MODULES.dashboard = (() => {
                     variation: window.calcVariation(kg, previousKg),
                     percentage: periodTotals.hazardous > 0 ? (kg / periodTotals.hazardous) * 100 : 0
                 };
-            }).filter(item => item.period > 0 || item.previous > 0).sort((a, b) => b.period - a.period),
+            }).filter(item => item.period > 0).sort((a, b) => b.period - a.period),
             specialSubcategoriesMonthly,
             rsadByUnitMonthly
         };
@@ -3665,4 +3645,3 @@ function loadTabContent(tabName) {
         contentArea.innerHTML = `<div class="text-center p-10"><h2 class="text-xl font-semibold">Módulo '${tabName}' en construcción.</h2></div>`;
     }
 }
-
