@@ -1,46 +1,42 @@
 // =================================================================================
 // GESTIÓNPRO - SCRIPT CENTRAL MULTI-ESTABLECIMIENTO (APP.JS)
-// Versión 28.0: Gráficos de Informe Mejorados y Detalle de Establecimiento.
-//
-// DESCRIPCIÓN:
-// Esta versión introduce gráficos detallados en los informes de establecimiento para
-// Residuos Asimilables (RSAD) y subcategorías de Residuos Especiales. Además,
-// en la vista de administrador, el resumen ejecutivo ahora especifica el hospital
-// de las unidades con mayor generación.
-//
-// CAMBIOS:
-// 1. (NUEVO) Gráfico de RSAD por Unidad: El informe de establecimiento ahora
-//    incluye un gráfico de barras que muestra las unidades que más residuos
-//    asimilables generan.
-// 2. (NUEVO) Gráfico de Tendencia de R. Especiales: Se añade un gráfico de
-//    barras apiladas para visualizar la evolución mensual de cada subcategoría
-//    de residuo especial en el informe.
-// 3. (MEJORADO) Detalle de Hospital en Resumen: El resumen ejecutivo del informe
-//    consolidado (admin) ahora muestra el nombre del hospital junto al nombre
-//    de la unidad en los rankings de mayor generación.
-// 4. (CORREGIDO) No se mostraba correctamente la subcategoría de especiales en
-//    el informe, se añade gráfico para mayor visibilidad.
-// =================================================================================
+// Versión 28.1: Corregido el conflicto de múltiples clientes de Supabase
 
 
 // ---------------------------------------------------------------------------------
 // PARTE 1: CONFIGURACIÓN Y CLIENTES DE SUPABASE
 // ---------------------------------------------------------------------------------
 
+// Extraemos la función createClient del objeto global de Supabase
+const { createClient } = window.supabase;
+
+// Configuración para el cliente principal (SST) que manejará la AUTENTICACIÓN
 const SUPABASE_URL_SST = 'https://mddxfoldoxtofjvevmfg.supabase.co';
 const SUPABASE_ANON_KEY_SST = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZHhmb2xkb3h0b2ZqdmV2bWZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3ODY3NjQsImV4cCI6MjA3MTM2Mjc2NH0.qgWe16qCy42PpvM10xZDT2Nxzvv3VL-rI4xyZjxROEg';
-const supabaseSST = window.supabase.createClient(SUPABASE_URL_SST, SUPABASE_ANON_KEY_SST);
 
+// Configuración para el cliente secundario (HPL)
 const SUPABASE_URL_HPL = 'https://peiuznumhjdynbffabyq.supabase.co';
 const SUPABASE_ANON_KEY_HPL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlaXV6bnVtaGpkeW5iZmZhYnlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNzI2NDYsImV4cCI6MjA3Mzk0ODY0Nn0.vVU32oYJFucSY9N0yGMwSjkJZuCdaA-nQsVxvMCz8nE';
-const supabaseHPL = window.supabase.createClient(SUPABASE_URL_HPL, SUPABASE_ANON_KEY_HPL);
 
+// INICIALIZACIÓN CORREGIDA
+// 1. Creamos el cliente principal (SST) que gestionará la sesión.
+const supabaseSST = createClient(SUPABASE_URL_SST, SUPABASE_ANON_KEY_SST);
+
+// 2. Creamos el cliente secundario (HPL) deshabilitando la persistencia de sesión para evitar conflictos.
+const supabaseHPL = createClient(SUPABASE_URL_HPL, SUPABASE_ANON_KEY_HPL, {
+  auth: {
+    persistSession: false
+  }
+});
+
+// 3. Organizamos los clientes para usarlos en la aplicación.
 const supabaseClients = {
     sst: { client: supabaseSST, name: 'SST' },
     hpl: { client: supabaseHPL, name: 'HPL' }
 };
-window.supabase = supabaseSST;
 
+// 4. Asignamos el cliente PRINCIPAL al objeto window para que el resto del código funcione.
+window.supabase = supabaseSST;
 // ---------------------------------------------------------------------------------
 // PARTE 2: ESTADO GLOBAL DE LA APLICACIÓN Y CACHÉ
 // ---------------------------------------------------------------------------------
@@ -3645,3 +3641,4 @@ function loadTabContent(tabName) {
         contentArea.innerHTML = `<div class="text-center p-10"><h2 class="text-xl font-semibold">Módulo '${tabName}' en construcción.</h2></div>`;
     }
 }
+
