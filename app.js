@@ -31,8 +31,8 @@ const SUPABASE_URL_SST = 'https://mddxfoldoxtofjvevmfg.supabase.co';
 const SUPABASE_ANON_KEY_SST = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZHhmb2xkb3h0b2ZqdmV2bWZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3ODY3NjQsImV4cCI6MjA3MTM2Mjc2NH0.qgWe16qCy42PpvM10xZDT2Nxzvv3VL-rI4xyZjxROEg';
 const supabaseSST = window.supabase.createClient(SUPABASE_URL_SST, SUPABASE_ANON_KEY_SST);
 
-const SUPABASE_URL_HPL = 'https://awnyfetnjoaffqchaofv.supabase.co';
-const SUPABASE_ANON_KEY_HPL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF3bnlmZXRuam9hZmZxY2hhb2Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NjA5MzAsImV4cCI6MjA2NTMzNjkzMH0.uV_rSurPAEg79d-czQq7qL3FfnNJhoYxMJ20JyDYNog';
+const SUPABASE_URL_HPL = 'https://peiuznumhjdynbffabyq.supabase.co';
+const SUPABASE_ANON_KEY_HPL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlaXV6bnVtaGpkeW5iZmZhYnlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNzI2NDYsImV4cCI6MjA3Mzk0ODY0Nn0.vVU32oYJFucSY9N0yGMwSjkJZuCdaA-nQsVxvMCz8nE';
 const supabaseHPL = window.supabase.createClient(SUPABASE_URL_HPL, SUPABASE_ANON_KEY_HPL);
 
 const supabaseClients = {
