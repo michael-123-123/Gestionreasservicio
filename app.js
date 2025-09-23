@@ -1,7 +1,7 @@
 // =================================================================================
 // GESTIÓNPRO - SCRIPT CENTRAL MULTI-ESTABLECIMIENTO (APP.JS)
 // Versión 28.1: Corregido el conflicto de múltiples clientes de Supabase
-
+// ... (resto de los comentarios) ...
 
 // ---------------------------------------------------------------------------------
 // PARTE 1: CONFIGURACIÓN Y CLIENTES DE SUPABASE
@@ -18,7 +18,7 @@ const SUPABASE_ANON_KEY_SST = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJz
 const SUPABASE_URL_HPL = 'https://peiuznumhjdynbffabyq.supabase.co';
 const SUPABASE_ANON_KEY_HPL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlaXV6bnVtaGpkeW5iZmZhYnlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNzI2NDYsImV4cCI6MjA3Mzk0ODY0Nn0.vVU32oYJFucSY9N0yGMwSjkJZuCdaA-nQsVxvMCz8nE';
 
-// INICIALIZACIÓN CORREGIDA
+// --- INICIALIZACIÓN CORREGIDA ---
 // 1. Creamos el cliente principal (SST) que gestionará la sesión.
 const supabaseSST = createClient(SUPABASE_URL_SST, SUPABASE_ANON_KEY_SST);
 
@@ -35,7 +35,7 @@ const supabaseClients = {
     hpl: { client: supabaseHPL, name: 'HPL' }
 };
 
-// 4. Asignamos el cliente PRINCIPAL al objeto window para que el resto del código funcione.
+// 4. Asignamos el cliente PRINCIPAL al objeto window para que el resto del código de autenticación funcione.
 window.supabase = supabaseSST;
 // ---------------------------------------------------------------------------------
 // PARTE 2: ESTADO GLOBAL DE LA APLICACIÓN Y CACHÉ
@@ -3641,4 +3641,5 @@ function loadTabContent(tabName) {
         contentArea.innerHTML = `<div class="text-center p-10"><h2 class="text-xl font-semibold">Módulo '${tabName}' en construcción.</h2></div>`;
     }
 }
+
 
