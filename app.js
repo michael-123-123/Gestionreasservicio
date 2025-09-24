@@ -1,48 +1,54 @@
 // =================================================================================
 // GESTIÓNPRO - SCRIPT CENTRAL MULTI-ESTABLECIMIENTO (APP.JS)
-// Versión 28.0: Gráficos de Informe Mejorados y Detalle de Establecimiento.
+// Versión 29.0: Solución Definitiva para Múltiples Clientes de Supabase
 //
-// DESCRIPCIÓN:
-// Esta versión introduce gráficos detallados en los informes de establecimiento para
-// Residuos Asimilables (RSAD) y subcategorías de Residuos Especiales. Además,
-// en la vista de administrador, el resumen ejecutivo ahora especifica el hospital
-// de las unidades con mayor generación.
-//
-// CAMBIOS:
-// 1. (NUEVO) Gráfico de RSAD por Unidad: El informe de establecimiento ahora
-//    incluye un gráfico de barras que muestra las unidades que más residuos
-//    asimilables generan.
-// 2. (NUEVO) Gráfico de Tendencia de R. Especiales: Se añade un gráfico de
-//    barras apiladas para visualizar la evolución mensual de cada subcategoría
-//    de residuo especial en el informe.
-// 3. (MEJORADO) Detalle de Hospital en Resumen: El resumen ejecutivo del informe
-//    consolidado (admin) ahora muestra el nombre del hospital junto al nombre
-//    de la unidad en los rankings de mayor generación.
-// 4. (CORREGIDO) No se mostraba correctamente la subcategoría de especiales en
-//    el informe, se añade gráfico para mayor visibilidad.
+// CAMBIOS CLAVE:
+// 1. (CORREGIDO) Se inicializan los clientes de Supabase de forma aislada usando
+//    `createClient` para evitar conflictos globales.
+// 2. (CORREGIDO) El cliente secundario (HPL) se crea con `persistSession: false`
+//    para no interferir con la autenticación principal.
+// 3. (CRÍTICO) Se implementa la transferencia de sesión de SST a HPL en la función
+//    `fetchUserProfile` usando `supabaseHPL.auth.setSession(session)`.
+//    Esto asegura que HPL pueda realizar peticiones autenticadas.
 // =================================================================================
 
-
 // ---------------------------------------------------------------------------------
-// PARTE 1: CONFIGURACIÓN Y CLIENTES DE SUPABASE
+// PARTE 1: CONFIGURACIÓN Y CLIENTES DE SUPABASE (VERSIÓN CORREGIDA)
 // ---------------------------------------------------------------------------------
 
+// Extraemos la función createClient para usarla de forma segura.
+const { createClient } = window.supabase;
+
+// URL y Clave Pública (ANON KEY) para el proyecto SST (Principal)
 const SUPABASE_URL_SST = 'https://mddxfoldoxtofjvevmfg.supabase.co';
-const SUPABASE_ANON_KEY_SST = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZHhmb2xkb3h0b2ZqdmV2bWZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3ODY3NjQsImV4cCI6MjA3MTM2Mjc2NH0.qgWe16qCy42PpvM10xZDT2Nxzvv3VL-rI4xyZjxROEg';
-const supabaseSST = window.supabase.createClient(SUPABASE_URL_SST, SUPABASE_ANON_KEY_SST);
+const SUPABASE_ANON_KEY_SST = 'eyJhbGciOiJIUzI futurasIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3ODY3NjQsImV4cCI6MjA3MTM2Mjc2NH0.qgWe16qCy42PpvM10xZDT2Nxzvv3VL-rI4xyZjxROEg';
 
+// URL y Clave Pública (ANON KEY) para el proyecto HPL (Secundario)
+// ¡¡¡ASEGÚRATE DE QUE ESTA CLAVE SEA LA MÁS RECIENTE OBTENIDA DEL PANEL DE SUPABASE!!!
 const SUPABASE_URL_HPL = 'https://peiuznumhjdynbffabyq.supabase.co';
 const SUPABASE_ANON_KEY_HPL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlaXV6bnVtaGpkeW5iZmZhYnlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3MTE4NTksImV4cCI6MjA3NDI4Nzg1OX0.T6KloEC3W-fpnaqNYxlNWV0aT4FyzxwPUD0UhcqvuJM';
-const supabaseHPL = window.supabase.createClient(SUPABASE_URL_HPL, SUPABASE_ANON_KEY_HPL);
+
+// Cliente principal (SST) - gestionará la autenticación y la sesión.
+const supabaseSST = createClient(SUPABASE_URL_SST, SUPABASE_ANON_KEY_SST);
+
+// Cliente secundario (HPL) - NO gestionará la sesión para evitar conflictos.
+const supabaseHPL = createClient(SUPABASE_URL_HPL, SUPABASE_ANON_KEY_HPL, {
+  auth: {
+    persistSession: false
+  }
+});
 
 const supabaseClients = {
     sst: { client: supabaseSST, name: 'SST' },
     hpl: { client: supabaseHPL, name: 'HPL' }
 };
+
+// Asignamos el cliente PRINCIPAL como el cliente global por defecto.
 window.supabase = supabaseSST;
 
+
 // ---------------------------------------------------------------------------------
-// PARTE 2: ESTADO GLOBAL DE LA APLICACIÓN Y CACHÉ
+// PARTE 2: ESTADO GLOBAL DE LA APLICACIÓN Y CACHÉ (Sin cambios)
 // ---------------------------------------------------------------------------------
 let appState = {
     user: null,
@@ -54,11 +60,11 @@ let appState = {
     allEstablishments: [],
     globalEstablishmentFilter: 'all',
     currentClient: supabaseSST,
-    globalListFilters: {} // Almacena filtros y ahora también el ordenamiento
+    globalListFilters: {}
 };
 
 // ---------------------------------------------------------------------------------
-// PARTE 3: MÓDULO DE AUTENTICACIÓN
+// PARTE 3: MÓDULO DE AUTENTICACIÓN (CON LA LÓGICA DE TRANSFERENCIA DE SESIÓN)
 // ---------------------------------------------------------------------------------
 const Auth = {
     async signUp(credentials) {
@@ -78,11 +84,25 @@ const Auth = {
         window.location.href = 'login.html';
     },
     async fetchUserProfile() {
+        // 1. Obtenemos la sesión del cliente principal (SST)
         const { data: { session } } = await supabaseSST.auth.getSession();
-        if (!session) throw new Error("No active session.");
+        if (!session) {
+            throw new Error("No hay sesión activa.");
+        }
+
+        // 2. (¡¡CRÍTICO!!) Compartimos la sesión con el cliente secundario (HPL)
+        // Esto le da a HPL el "permiso" para hacer peticiones autenticadas.
+        const { error: sessionError } = await supabaseHPL.auth.setSession(session);
+        if (sessionError) {
+            console.error("Error al establecer la sesión en el cliente HPL:", sessionError);
+            throw new Error(`Fallo de autenticación con la base de datos secundaria: ${sessionError.message}`);
+        }
         
+        console.log("Sesión establecida correctamente en ambos clientes.");
+
         appState.user = session.user;
 
+        // El resto del flujo continúa normalmente
         let { data: profile, error } = await supabaseSST
             .from('perfiles')
             .select('*, establecimiento:establecimientos(id, nombre)')
@@ -91,12 +111,12 @@ const Auth = {
 
         if (error) {
             if (error.code === 'PGRST116') {
-                console.log("Profile not found, creating a new one.");
+                console.log("Perfil no encontrado, creando uno nuevo.");
                 const { error: insertError } = await supabaseSST.from('perfiles').insert([{ id: session.user.id, email: session.user.email }]);
-                if (insertError) throw new Error("Failed to create user profile: " + insertError.message);
+                if (insertError) throw new Error("Fallo al crear el perfil de usuario: " + insertError.message);
                 return this.fetchUserProfile();
             } else {
-                throw new Error("Failed to fetch user profile: " + error.message);
+                throw new Error("Fallo al obtener el perfil de usuario: " + error.message);
             }
         }
         
@@ -127,7 +147,7 @@ const Auth = {
         try {
             return await this.fetchUserProfile();
         } catch (error) {
-            console.error("Authentication check failed:", error.message);
+            console.error("Fallo la verificación de autenticación:", error.message);
             if (!window.location.pathname.endsWith('/login.html')) {
                 window.location.href = 'login.html';
             }
@@ -3645,3 +3665,4 @@ function loadTabContent(tabName) {
         contentArea.innerHTML = `<div class="text-center p-10"><h2 class="text-xl font-semibold">Módulo '${tabName}' en construcción.</h2></div>`;
     }
 }
+
