@@ -1,12 +1,6 @@
 // =================================================================================
 // GESTIÓNPRO - SCRIPT CENTRAL MULTI-ESTABLECIMIENTO (APP.JS)
 // Versión 31.0: Solución Definitiva con Estructura de Inicialización Corregida
-//
-// CAMBIO CRÍTICO:
-// - Se ha reestructurado todo el script para que se inicialice dentro de un evento
-//   'DOMContentLoaded'. Esto asegura que todos los módulos y funciones estén
-//   completamente definidos antes de que se ejecute la lógica de autenticación
-//   y la carga de la aplicación, eliminando el bucle de redirección.
 // =================================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -34,17 +28,10 @@ document.addEventListener('DOMContentLoaded', () => {
     window.supabase = supabaseSST;
 
     // ---------------------------------------------------------------------------------
-    // PARTE 2: ESTADO GLOBAL DE LA APLICACIÓN
+    // ESTADO GLOBAL Y MÓDULO DE AUTENTICACIÓN
     // ---------------------------------------------------------------------------------
-    let appState = {
-        user: null, profile: null, establishment: null, unitsCache: [],
-        suppliesCache: [], agreementsCache: [], allEstablishments: [],
-        globalEstablishmentFilter: 'all', currentClient: supabaseSST, globalListFilters: {}
-    };
-
-    // ---------------------------------------------------------------------------------
-    // PARTE 3: MÓDULO DE AUTENTICACIÓN
-    // ---------------------------------------------------------------------------------
+    let appState = { user: null, profile: null, establishment: null, unitsCache: [], suppliesCache: [], agreementsCache: [], allEstablishments: [], globalEstablishmentFilter: 'all', currentClient: supabaseSST, globalListFilters: {} };
+    
     const Auth = {
         async signUp(credentials) {
             const { data, error } = await supabaseSST.auth.signUp(credentials);
@@ -66,28 +53,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const { data: { session } } = await supabaseSST.auth.getSession();
             if (!session) throw new Error("No active session.");
 
-            const { error: sessionError } = await supabaseHPL.auth.setSession(session);
-            if (sessionError) {
-                console.error("Error setting session on HPL client:", sessionError);
-                throw new Error(`Authentication failure with secondary database: ${sessionError.message}`);
-            }
-
+            await supabaseHPL.auth.setSession(session);
             appState.user = session.user;
 
-            let { data: profile, error } = await supabaseSST
-                .from('perfiles')
-                .select('*, establecimiento:establecimientos(id, nombre)')
-                .eq('id', session.user.id)
-                .single();
+            let { data: profile, error } = await supabaseSST.from('perfiles').select('*, establecimiento:establecimientos(id, nombre)').eq('id', session.user.id).single();
 
-            if (error) {
-                if (error.code === 'PGRST116') {
-                    const { error: insertError } = await supabaseSST.from('perfiles').insert([{ id: session.user.id, email: session.user.email }]);
-                    if (insertError) throw new Error("Failed to create user profile: " + insertError.message);
-                    return this.fetchUserProfile();
-                } else {
-                    throw new Error("Failed to fetch user profile: " + error.message);
-                }
+            if (error && error.code === 'PGRST116') {
+                const { error: insertError } = await supabaseSST.from('perfiles').insert([{ id: session.user.id, email: session.user.email }]);
+                if (insertError) throw new Error("Failed to create user profile: " + insertError.message);
+                return this.fetchUserProfile();
+            } else if (error) {
+                throw new Error("Failed to fetch user profile: " + error.message);
             }
 
             appState.profile = profile;
@@ -95,11 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 appState.establishment = { ...profile.establecimiento, source: 'sst' };
             } else {
                 const isHPLUser = profile.rol && profile.rol.toLowerCase().includes('hpl');
-                if(isHPLUser) {
-                    appState.establishment = { id: 1, nombre: 'Hospital Penco Lirquén', source: 'hpl' };
-                } else {
-                    appState.establishment = null;
-                }
+                appState.establishment = isHPLUser ? { id: 1, nombre: 'Hospital Penco Lirquén', source: 'hpl' } : null;
             }
 
             if (profile.rol === 'admin') {
@@ -110,7 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 appState.currentClient = supabaseSST;
             }
-
             return profile;
         },
         async checkAuth() {
@@ -124,10 +95,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return null;
             }
         },
-        async updateProfile(userId, updates) {
-            const { error } = await supabaseSST.from('perfiles').update(updates).eq('id', userId);
-            return error;
-        }
     };
     window.Auth = Auth;
 
@@ -3490,8 +3457,6 @@ window.APP_MODULES.wastePoints = (() => {
 // ---------------------------------------------------------------------------------
     // PARTE 9: PUNTO DE ENTRADA Y LÓGICA DE INICIALIZACIÓN
     // ---------------------------------------------------------------------------------
-
-    // Función principal de la aplicación
     async function mainApp() {
         await Promise.all([loadAllEstablishments(), loadUnitsCache(), loadSuppliesCache(), loadAgreementsCache()]);
         populateNavbar();
@@ -3503,6 +3468,15 @@ window.APP_MODULES.wastePoints = (() => {
             loadTabContent('dashboard');
         }
     }
+
+    if (document.body.id !== 'login-page') {
+        Auth.checkAuth().then(profile => {
+            if (profile) {
+                mainApp();
+            }
+        });
+    }
+});
 
     // Lógica de arranque
     if (document.body.id === 'login-page') {
@@ -3679,6 +3653,7 @@ function loadTabContent(tabName) {
         contentArea.innerHTML = `<div class="text-center p-10"><h2 class="text-xl font-semibold">Módulo '${tabName}' en construcción.</h2></div>`;
     }
 }
+
 
 
 
