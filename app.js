@@ -1,13 +1,25 @@
 // =================================================================================
 // GESTIÓNPRO - SCRIPT CENTRAL MULTI-ESTABLECIMIENTO (APP.JS)
-// Versión 28.2: Solución definitiva para autenticación multi-cliente en Vercel
+// Versión 28.0: Gráficos de Informe Mejorados y Detalle de Establecimiento.
 //
-// CAMBIOS CLAVE:
-// 1. (CORREGIDO) Se evita el conflicto 'Multiple GoTrueClient' al inicializar HPL
-//    con `persistSession: false`.
-// 2. (NUEVO Y CRÍTICO) Se comparte la sesión del usuario principal (SST) con el cliente
-//    secundario (HPL) usando `setSession()`. Esto permite que HPL haga peticiones
-//    autenticadas y cumpla con las políticas de seguridad (RLS).
+// DESCRIPCIÓN:
+// Esta versión introduce gráficos detallados en los informes de establecimiento para
+// Residuos Asimilables (RSAD) y subcategorías de Residuos Especiales. Además,
+// en la vista de administrador, el resumen ejecutivo ahora especifica el hospital
+// de las unidades con mayor generación.
+//
+// CAMBIOS:
+// 1. (NUEVO) Gráfico de RSAD por Unidad: El informe de establecimiento ahora
+//    incluye un gráfico de barras que muestra las unidades que más residuos
+//    asimilables generan.
+// 2. (NUEVO) Gráfico de Tendencia de R. Especiales: Se añade un gráfico de
+//    barras apiladas para visualizar la evolución mensual de cada subcategoría
+//    de residuo especial en el informe.
+// 3. (MEJORADO) Detalle de Hospital en Resumen: El resumen ejecutivo del informe
+//    consolidado (admin) ahora muestra el nombre del hospital junto al nombre
+//    de la unidad en los rankings de mayor generación.
+// 4. (CORREGIDO) No se mostraba correctamente la subcategoría de especiales en
+//    el informe, se añade gráfico para mayor visibilidad.
 // =================================================================================
 
 
@@ -15,29 +27,19 @@
 // PARTE 1: CONFIGURACIÓN Y CLIENTES DE SUPABASE
 // ---------------------------------------------------------------------------------
 
-const { createClient } = window.supabase;
-
 const SUPABASE_URL_SST = 'https://mddxfoldoxtofjvevmfg.supabase.co';
 const SUPABASE_ANON_KEY_SST = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZHhmb2xkb3h0b2ZqdmV2bWZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3ODY3NjQsImV4cCI6MjA3MTM2Mjc2NH0.qgWe16qCy42PpvM10xZDT2Nxzvv3VL-rI4xyZjxROEg';
+const supabaseSST = window.supabase.createClient(SUPABASE_URL_SST, SUPABASE_ANON_KEY_SST);
 
 const SUPABASE_URL_HPL = 'https://peiuznumhjdynbffabyq.supabase.co';
 const SUPABASE_ANON_KEY_HPL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlaXV6bnVtaGpkeW5iZmZhYnlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3MTE4NTksImV4cCI6MjA3NDI4Nzg1OX0.T6KloEC3W-fpnaqNYxlNWV0aT4FyzxwPUD0UhcqvuJM';
-
-// Cliente principal (SST) que gestiona la sesión.
-const supabaseSST = createClient(SUPABASE_URL_SST, SUPABASE_ANON_KEY_SST);
-
-// Cliente secundario (HPL) con persistencia de sesión deshabilitada.
-const supabaseHPL = createClient(SUPABASE_URL_HPL, SUPABASE_ANON_KEY_HPL, {
-  auth: {
-    persistSession: false
-  }
-});
+const supabaseHPL = window.supabase.createClient(SUPABASE_URL_HPL, SUPABASE_ANON_KEY_HPL);
 
 const supabaseClients = {
     sst: { client: supabaseSST, name: 'SST' },
     hpl: { client: supabaseHPL, name: 'HPL' }
 };
-window.supabase = supabaseSST; // El cliente principal sigue siendo el global por defecto.
+window.supabase = supabaseSST;
 
 // ---------------------------------------------------------------------------------
 // PARTE 2: ESTADO GLOBAL DE LA APLICACIÓN Y CACHÉ
@@ -56,7 +58,7 @@ let appState = {
 };
 
 // ---------------------------------------------------------------------------------
-// PARTE 3: MÓDULO DE AUTENTICACIÓN (CON LA CORRECCIÓN CLAVE)
+// PARTE 3: MÓDULO DE AUTENTICACIÓN
 // ---------------------------------------------------------------------------------
 const Auth = {
     async signUp(credentials) {
@@ -78,14 +80,7 @@ const Auth = {
     async fetchUserProfile() {
         const { data: { session } } = await supabaseSST.auth.getSession();
         if (!session) throw new Error("No active session.");
-
-        // ==========================================================
-        //  AQUÍ ESTÁ LA NUEVA LÍNEA CRÍTICA
-        //  Compartimos la sesión de SST con el cliente HPL para que
-        //  pueda hacer peticiones autenticadas.
-        // ==========================================================
-        await supabaseHPL.auth.setSession(session);
-
+        
         appState.user = session.user;
 
         let { data: profile, error } = await supabaseSST
@@ -145,6 +140,7 @@ const Auth = {
     }
 };
 window.Auth = Auth;
+
 // ---------------------------------------------------------------------------------
 // PARTE 4: CONFIGURACIÓN GLOBAL Y DATOS
 // ---------------------------------------------------------------------------------
@@ -3649,7 +3645,3 @@ function loadTabContent(tabName) {
         contentArea.innerHTML = `<div class="text-center p-10"><h2 class="text-xl font-semibold">Módulo '${tabName}' en construcción.</h2></div>`;
     }
 }
-
-
-
-
