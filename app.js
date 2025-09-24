@@ -1,142 +1,135 @@
 // =================================================================================
 // GESTIÓNPRO - SCRIPT CENTRAL MULTI-ESTABLECIMIENTO (APP.JS)
-// Versión 30.0: Solución Definitiva al Bucle de Autenticación
+// Versión 31.0: Solución Definitiva con Estructura de Inicialización Corregida
 //
-// CAMBIOS CLAVE:
-// 1. (CORREGIDO) Se mantienen todas las correcciones anteriores para el manejo de
-//    múltiples clientes de Supabase y la sincronización de sesión.
-// 2. (CRÍTICO) Se ha modificado la función `mainApp()` para manejar correctamente
-//    el caso en que un usuario válido (rol no-admin) aún no tiene un establecimiento
-//    asignado, evitando el bucle de redirección.
+// CAMBIO CRÍTICO:
+// - Se ha reestructurado todo el script para que se inicialice dentro de un evento
+//   'DOMContentLoaded'. Esto asegura que todos los módulos y funciones estén
+//   completamente definidos antes de que se ejecute la lógica de autenticación
+//   y la carga de la aplicación, eliminando el bucle de redirección.
 // =================================================================================
 
-// ---------------------------------------------------------------------------------
-// PARTE 1: CONFIGURACIÓN Y CLIENTES DE SUPABASE (VERSIÓN CORRECTA)
-// ---------------------------------------------------------------------------------
-const { createClient } = window.supabase;
+document.addEventListener('DOMContentLoaded', () => {
 
-const SUPABASE_URL_SST = 'https://mddxfoldoxtofjvevmfg.supabase.co';
-const SUPABASE_ANON_KEY_SST = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZHhmb2xkb3h0b2ZqdmV2bWZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3ODY3NjQsImV4cCI6MjA3MTM2Mjc2NH0.qgWe16qCy42PpvM10xZDT2Nxzvv3VL-rI4xyZjxROEg';
+    // ---------------------------------------------------------------------------------
+    // PARTE 1: CONFIGURACIÓN Y CLIENTES DE SUPABASE
+    // ---------------------------------------------------------------------------------
+    const { createClient } = window.supabase;
 
-const SUPABASE_URL_HPL = 'https://peiuznumhjdynbffabyq.supabase.co';
-const SUPABASE_ANON_KEY_HPL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlaXV6bnVtaGpkeW5iZmZhYnlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3MTE4NTksImV4cCI6MjA3NDI4Nzg1OX0.T6KloEC3W-fpnaqNYxlNWV0aT4FyzxwPUD0UhcqvuJM';
+    const SUPABASE_URL_SST = 'https://mddxfoldoxtofjvevmfg.supabase.co';
+    const SUPABASE_ANON_KEY_SST = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZHhmb2xkb3h0b2ZqdmV2bWZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3ODY3NjQsImV4cCI6MjA3MTM2Mjc2NH0.qgWe16qCy42PpvM10xZDT2Nxzvv3VL-rI4xyZjxROEg';
 
-const supabaseSST = createClient(SUPABASE_URL_SST, SUPABASE_ANON_KEY_SST);
-const supabaseHPL = createClient(SUPABASE_URL_HPL, SUPABASE_ANON_KEY_HPL, {
-  auth: { persistSession: false }
-});
+    const SUPABASE_URL_HPL = 'https://peiuznumhjdynbffabyq.supabase.co';
+    const SUPABASE_ANON_KEY_HPL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlaXV6bnVtaGpkeW5iZmZhYnlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3MTE4NTksImV4cCI6MjA3NDI4Nzg1OX0.T6KloEC3W-fpnaqNYxlNWV0aT4FyzxwPUD0UhcqvuJM';
 
-const supabaseClients = {
-    sst: { client: supabaseSST, name: 'SST' },
-    hpl: { client: supabaseHPL, name: 'HPL' }
-};
-window.supabase = supabaseSST;
+    const supabaseSST = createClient(SUPABASE_URL_SST, SUPABASE_ANON_KEY_SST);
+    const supabaseHPL = createClient(SUPABASE_URL_HPL, SUPABASE_ANON_KEY_HPL, {
+        auth: { persistSession: false }
+    });
 
-// ---------------------------------------------------------------------------------
-// PARTE 2: ESTADO GLOBAL DE LA APLICACIÓN
-// ---------------------------------------------------------------------------------
-let appState = {
-    user: null,
-    profile: null,
-    establishment: null,
-    unitsCache: [],
-    suppliesCache: [],
-    agreementsCache: [],
-    allEstablishments: [],
-    globalEstablishmentFilter: 'all',
-    currentClient: supabaseSST,
-    globalListFilters: {}
-};
+    const supabaseClients = {
+        sst: { client: supabaseSST, name: 'SST' },
+        hpl: { client: supabaseHPL, name: 'HPL' }
+    };
+    window.supabase = supabaseSST;
 
-// ---------------------------------------------------------------------------------
-// PARTE 3: MÓDULO DE AUTENTICACIÓN
-// ---------------------------------------------------------------------------------
-const Auth = {
-    async signUp(credentials) {
-        const { data, error } = await supabaseSST.auth.signUp(credentials);
-        if (error) return error;
-        await supabaseSST.from('perfiles').insert([{ id: data.user.id, email: data.user.email }]);
-        window.location.href = 'index.html';
-        return null;
-    },
-    async signIn(credentials) {
-        const { error } = await supabaseSST.auth.signInWithPassword(credentials);
-        if (!error) window.location.href = 'index.html';
-        return error;
-    },
-    async signOut() {
-        await supabaseSST.auth.signOut();
-        window.location.href = 'login.html';
-    },
-    async fetchUserProfile() {
-        const { data: { session } } = await supabaseSST.auth.getSession();
-        if (!session) throw new Error("No active session.");
+    // ---------------------------------------------------------------------------------
+    // PARTE 2: ESTADO GLOBAL DE LA APLICACIÓN
+    // ---------------------------------------------------------------------------------
+    let appState = {
+        user: null, profile: null, establishment: null, unitsCache: [],
+        suppliesCache: [], agreementsCache: [], allEstablishments: [],
+        globalEstablishmentFilter: 'all', currentClient: supabaseSST, globalListFilters: {}
+    };
 
-        const { error: sessionError } = await supabaseHPL.auth.setSession(session);
-        if (sessionError) {
-            console.error("Error setting session on HPL client:", sessionError);
-            throw new Error(`Authentication failure with secondary database: ${sessionError.message}`);
-        }
-
-        appState.user = session.user;
-
-        let { data: profile, error } = await supabaseSST
-            .from('perfiles')
-            .select('*, establecimiento:establecimientos(id, nombre)')
-            .eq('id', session.user.id)
-            .single();
-
-        if (error) {
-            if (error.code === 'PGRST116') {
-                console.log("Profile not found, creating a new one.");
-                const { error: insertError } = await supabaseSST.from('perfiles').insert([{ id: session.user.id, email: session.user.email }]);
-                if (insertError) throw new Error("Failed to create user profile: " + insertError.message);
-                return this.fetchUserProfile();
-            } else {
-                throw new Error("Failed to fetch user profile: " + error.message);
-            }
-        }
-
-        appState.profile = profile;
-        if (profile.establecimiento) {
-            appState.establishment = { ...profile.establecimiento, source: 'sst' };
-        } else {
-             const isHPLUser = profile.rol && profile.rol.toLowerCase().includes('hpl');
-             if(isHPLUser) {
-                appState.establishment = { id: 1, nombre: 'Hospital Penco Lirquén', source: 'hpl' };
-             } else {
-                appState.establishment = null;
-             }
-        }
-
-        if (profile.rol === 'admin') {
-            const [source] = appState.globalEstablishmentFilter.split(/-(.+)/);
-            appState.currentClient = getSupabaseClient(source);
-        } else if (appState.establishment) {
-            appState.currentClient = getSupabaseClient(appState.establishment.source);
-        } else {
-            appState.currentClient = supabaseSST;
-        }
-
-        return profile;
-    },
-    async checkAuth() {
-        try {
-            return await this.fetchUserProfile();
-        } catch (error) {
-            console.error("Authentication check failed:", error.message);
-            if (!window.location.pathname.endsWith('/login.html')) {
-                window.location.href = 'login.html';
-            }
+    // ---------------------------------------------------------------------------------
+    // PARTE 3: MÓDULO DE AUTENTICACIÓN
+    // ---------------------------------------------------------------------------------
+    const Auth = {
+        async signUp(credentials) {
+            const { data, error } = await supabaseSST.auth.signUp(credentials);
+            if (error) return error;
+            await supabaseSST.from('perfiles').insert([{ id: data.user.id, email: data.user.email }]);
+            window.location.href = 'index.html';
             return null;
+        },
+        async signIn(credentials) {
+            const { error } = await supabaseSST.auth.signInWithPassword(credentials);
+            if (!error) window.location.href = 'index.html';
+            return error;
+        },
+        async signOut() {
+            await supabaseSST.auth.signOut();
+            window.location.href = 'login.html';
+        },
+        async fetchUserProfile() {
+            const { data: { session } } = await supabaseSST.auth.getSession();
+            if (!session) throw new Error("No active session.");
+
+            const { error: sessionError } = await supabaseHPL.auth.setSession(session);
+            if (sessionError) {
+                console.error("Error setting session on HPL client:", sessionError);
+                throw new Error(`Authentication failure with secondary database: ${sessionError.message}`);
+            }
+
+            appState.user = session.user;
+
+            let { data: profile, error } = await supabaseSST
+                .from('perfiles')
+                .select('*, establecimiento:establecimientos(id, nombre)')
+                .eq('id', session.user.id)
+                .single();
+
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    const { error: insertError } = await supabaseSST.from('perfiles').insert([{ id: session.user.id, email: session.user.email }]);
+                    if (insertError) throw new Error("Failed to create user profile: " + insertError.message);
+                    return this.fetchUserProfile();
+                } else {
+                    throw new Error("Failed to fetch user profile: " + error.message);
+                }
+            }
+
+            appState.profile = profile;
+            if (profile.establecimiento) {
+                appState.establishment = { ...profile.establecimiento, source: 'sst' };
+            } else {
+                const isHPLUser = profile.rol && profile.rol.toLowerCase().includes('hpl');
+                if(isHPLUser) {
+                    appState.establishment = { id: 1, nombre: 'Hospital Penco Lirquén', source: 'hpl' };
+                } else {
+                    appState.establishment = null;
+                }
+            }
+
+            if (profile.rol === 'admin') {
+                const [source] = appState.globalEstablishmentFilter.split(/-(.+)/);
+                appState.currentClient = getSupabaseClient(source);
+            } else if (appState.establishment) {
+                appState.currentClient = getSupabaseClient(appState.establishment.source);
+            } else {
+                appState.currentClient = supabaseSST;
+            }
+
+            return profile;
+        },
+        async checkAuth() {
+            try {
+                return await this.fetchUserProfile();
+            } catch (error) {
+                console.error("Authentication check failed:", error.message);
+                if (!window.location.pathname.endsWith('/login.html')) {
+                    window.location.href = 'login.html';
+                }
+                return null;
+            }
+        },
+        async updateProfile(userId, updates) {
+            const { error } = await supabaseSST.from('perfiles').update(updates).eq('id', userId);
+            return error;
         }
-    },
-    async updateProfile(userId, updates) {
-        const { error } = await supabaseSST.from('perfiles').update(updates).eq('id', userId);
-        return error;
-    }
-};
-window.Auth = Auth;
+    };
+    window.Auth = Auth;
 
 // ---------------------------------------------------------------------------------
 // PARTE 4: CONFIGURACIÓN GLOBAL Y DATOS
@@ -3495,42 +3488,77 @@ window.APP_MODULES.wastePoints = (() => {
 })();
 
 // ---------------------------------------------------------------------------------
-// PARTE 9: PUNTO DE ENTRADA Y LÓGICA DE INICIALIZACIÓN (LÓGICA CORREGIDA)
-// ---------------------------------------------------------------------------------
+    // PARTE 9: PUNTO DE ENTRADA Y LÓGICA DE INICIALIZACIÓN
+    // ---------------------------------------------------------------------------------
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Si no estamos en la página de login, iniciamos la verificación.
-    if (document.body.id !== 'login-page') {
+    // Función principal de la aplicación
+    async function mainApp() {
+        await Promise.all([loadAllEstablishments(), loadUnitsCache(), loadSuppliesCache(), loadAgreementsCache()]);
+        populateNavbar();
+        setupTabs();
+        await setupUserProfile();
+        if (appState.profile.rol !== 'admin' && !appState.establishment) {
+            showEstablishmentSelector();
+        } else {
+            loadTabContent('dashboard');
+        }
+    }
+
+    // Lógica de arranque
+    if (document.body.id === 'login-page') {
+        // Si estamos en la página de login, solo configuramos los formularios.
+        const loginForm = document.getElementById('login-form');
+        const signupForm = document.getElementById('signup-form');
+        const toggleLink = document.getElementById('toggle-link');
+        const errorMessage = document.getElementById('error-message');
+
+        const toggleForms = (e) => {
+            if(e) e.preventDefault();
+            errorMessage.textContent = '';
+            loginForm.classList.toggle('hidden');
+            signupForm.classList.toggle('hidden');
+            const isLoginVisible = !loginForm.classList.contains('hidden');
+            document.getElementById('toggle-text').innerHTML = isLoginVisible
+                ? '¿No tienes una cuenta? <a href="#" id="toggle-link" class="font-medium text-indigo-600 hover:text-indigo-500">Regístrate aquí</a>'
+                : '¿Ya tienes una cuenta? <a href="#" id="toggle-link" class="font-medium text-indigo-600 hover:text-indigo-500">Inicia sesión</a>';
+            document.getElementById('toggle-link').addEventListener('click', toggleForms);
+        };
+        toggleLink.addEventListener('click', toggleForms);
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector('button');
+            btn.disabled = true;
+            btn.textContent = 'Ingresando...';
+            const error = await window.Auth.signIn({ email: e.target.email.value, password: e.target.password.value });
+            if (error) {
+                errorMessage.textContent = `Error: ${error.message}`;
+                btn.disabled = false;
+                btn.textContent = 'Iniciar Sesión';
+            }
+        });
+
+        signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector('button');
+            btn.disabled = true;
+            btn.textContent = 'Creando...';
+            const error = await window.Auth.signUp({ email: e.target.email.value, password: e.target.password.value });
+            if (error) {
+                errorMessage.textContent = `Error: ${error.message}`;
+                btn.disabled = false;
+                btn.textContent = 'Crear Cuenta';
+            }
+        });
+    } else {
+        // Si no estamos en la página de login, iniciamos la verificación de Auth.
         Auth.checkAuth().then(profile => {
-            // Si la verificación es exitosa y obtenemos un perfil, iniciamos la app.
             if (profile) {
                 mainApp();
             }
-            // Si checkAuth falla, él mismo se encargará de redirigir a login.html.
         });
     }
 });
-
-async function mainApp() {
-    // Estas funciones cargan datos necesarios para la app.
-    await Promise.all([loadAllEstablishments(), loadUnitsCache(), loadSuppliesCache(), loadAgreementsCache()]);
-
-    // Llenamos la barra de navegación y el perfil de usuario.
-    populateNavbar();
-    setupTabs();
-    await setupUserProfile();
-
-    // --- LÓGICA CRÍTICA CORREGIDA ---
-    // Si el usuario NO es admin Y AÚN no tiene un establecimiento asignado,
-    // le mostramos el selector para que elija uno.
-    if (appState.profile.rol !== 'admin' && !appState.establishment) {
-        showEstablishmentSelector();
-    } else {
-        // Si es admin o si ya tiene un establecimiento, cargamos el dashboard.
-        loadTabContent('dashboard');
-    }
-}
-
 
 async function showEstablishmentSelector() {
     const contentArea = document.getElementById('main-content');
@@ -3651,6 +3679,7 @@ function loadTabContent(tabName) {
         contentArea.innerHTML = `<div class="text-center p-10"><h2 class="text-xl font-semibold">Módulo '${tabName}' en construcción.</h2></div>`;
     }
 }
+
 
 
 
