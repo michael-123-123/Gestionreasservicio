@@ -21,7 +21,7 @@ const SUPABASE_URL_SST = 'https://mddxfoldoxtofjvevmfg.supabase.co';
 const SUPABASE_ANON_KEY_SST = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZHhmb2xkb3h0b2ZqdmV2bWZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3ODY3NjQsImV4cCI6MjA3MTM2Mjc2NH0.qgWe16qCy42PpvM10xZDT2Nxzvv3VL-rI4xyZjxROEg';
 
 const SUPABASE_URL_HPL = 'https://peiuznumhjdynbffabyq.supabase.co';
-const SUPABASE_ANON_KEY_HPL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlaXV6bnVtaGpkeW5iZmZhYnlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNzI2NDYsImV4cCI6MjA3Mzk0ODY0Nn0.vVU32oYJFucSY9N0yGMwSjkJZuCdaA-nQsVxvMCz8nE';
+const SUPABASE_ANON_KEY_HPL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlaXV6bnVtaGpkeW5iZmZhYnlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3MTE4NTksImV4cCI6MjA3NDI4Nzg1OX0.T6KloEC3W-fpnaqNYxlNWV0aT4FyzxwPUD0UhcqvuJM';
 
 // Cliente principal (SST) que gestiona la sesión.
 const supabaseSST = createClient(SUPABASE_URL_SST, SUPABASE_ANON_KEY_SST);
@@ -3649,6 +3649,7 @@ function loadTabContent(tabName) {
         contentArea.innerHTML = `<div class="text-center p-10"><h2 class="text-xl font-semibold">Módulo '${tabName}' en construcción.</h2></div>`;
     }
 }
+
 
 
 
