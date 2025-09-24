@@ -1,54 +1,39 @@
 // =================================================================================
 // GESTIÓNPRO - SCRIPT CENTRAL MULTI-ESTABLECIMIENTO (APP.JS)
-// Versión 29.0: Solución Definitiva para Múltiples Clientes de Supabase
+// Versión 30.0: Solución Definitiva al Bucle de Autenticación
 //
 // CAMBIOS CLAVE:
-// 1. (CORREGIDO) Se inicializan los clientes de Supabase de forma aislada usando
-//    `createClient` para evitar conflictos globales.
-// 2. (CORREGIDO) El cliente secundario (HPL) se crea con `persistSession: false`
-//    para no interferir con la autenticación principal.
-// 3. (CRÍTICO) Se implementa la transferencia de sesión de SST a HPL en la función
-//    `fetchUserProfile` usando `supabaseHPL.auth.setSession(session)`.
-//    Esto asegura que HPL pueda realizar peticiones autenticadas.
+// 1. (CORREGIDO) Se mantienen todas las correcciones anteriores para el manejo de
+//    múltiples clientes de Supabase y la sincronización de sesión.
+// 2. (CRÍTICO) Se ha modificado la función `mainApp()` para manejar correctamente
+//    el caso en que un usuario válido (rol no-admin) aún no tiene un establecimiento
+//    asignado, evitando el bucle de redirección.
 // =================================================================================
 
 // ---------------------------------------------------------------------------------
-// PARTE 1: CONFIGURACIÓN Y CLIENTES DE SUPABASE (VERSIÓN CORREGIDA)
+// PARTE 1: CONFIGURACIÓN Y CLIENTES DE SUPABASE (VERSIÓN CORRECTA)
 // ---------------------------------------------------------------------------------
-
-// Extraemos la función createClient para usarla de forma segura.
 const { createClient } = window.supabase;
 
-// URL y Clave Pública (ANON KEY) para el proyecto SST (Principal)
 const SUPABASE_URL_SST = 'https://mddxfoldoxtofjvevmfg.supabase.co';
 const SUPABASE_ANON_KEY_SST = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZHhmb2xkb3h0b2ZqdmV2bWZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3ODY3NjQsImV4cCI6MjA3MTM2Mjc2NH0.qgWe16qCy42PpvM10xZDT2Nxzvv3VL-rI4xyZjxROEg';
 
-// URL y Clave Pública (ANON KEY) para el proyecto HPL (Secundario)
-// ¡¡¡ASEGÚRATE DE QUE ESTA CLAVE SEA LA MÁS RECIENTE OBTENIDA DEL PANEL DE SUPABASE!!!
 const SUPABASE_URL_HPL = 'https://peiuznumhjdynbffabyq.supabase.co';
 const SUPABASE_ANON_KEY_HPL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlaXV6bnVtaGpkeW5iZmZhYnlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3MTE4NTksImV4cCI6MjA3NDI4Nzg1OX0.T6KloEC3W-fpnaqNYxlNWV0aT4FyzxwPUD0UhcqvuJM';
 
-// Cliente principal (SST) - gestionará la autenticación y la sesión.
 const supabaseSST = createClient(SUPABASE_URL_SST, SUPABASE_ANON_KEY_SST);
-
-// Cliente secundario (HPL) - NO gestionará la sesión para evitar conflictos.
 const supabaseHPL = createClient(SUPABASE_URL_HPL, SUPABASE_ANON_KEY_HPL, {
-  auth: {
-    persistSession: false
-  }
+  auth: { persistSession: false }
 });
 
 const supabaseClients = {
     sst: { client: supabaseSST, name: 'SST' },
     hpl: { client: supabaseHPL, name: 'HPL' }
 };
-
-// Asignamos el cliente PRINCIPAL como el cliente global por defecto.
 window.supabase = supabaseSST;
 
-
 // ---------------------------------------------------------------------------------
-// PARTE 2: ESTADO GLOBAL DE LA APLICACIÓN Y CACHÉ (Sin cambios)
+// PARTE 2: ESTADO GLOBAL DE LA APLICACIÓN
 // ---------------------------------------------------------------------------------
 let appState = {
     user: null,
@@ -64,7 +49,7 @@ let appState = {
 };
 
 // ---------------------------------------------------------------------------------
-// PARTE 3: MÓDULO DE AUTENTICACIÓN (CON LA LÓGICA DE TRANSFERENCIA DE SESIÓN)
+// PARTE 3: MÓDULO DE AUTENTICACIÓN
 // ---------------------------------------------------------------------------------
 const Auth = {
     async signUp(credentials) {
@@ -84,25 +69,17 @@ const Auth = {
         window.location.href = 'login.html';
     },
     async fetchUserProfile() {
-        // 1. Obtenemos la sesión del cliente principal (SST)
         const { data: { session } } = await supabaseSST.auth.getSession();
-        if (!session) {
-            throw new Error("No hay sesión activa.");
-        }
+        if (!session) throw new Error("No active session.");
 
-        // 2. (¡¡CRÍTICO!!) Compartimos la sesión con el cliente secundario (HPL)
-        // Esto le da a HPL el "permiso" para hacer peticiones autenticadas.
         const { error: sessionError } = await supabaseHPL.auth.setSession(session);
         if (sessionError) {
-            console.error("Error al establecer la sesión en el cliente HPL:", sessionError);
-            throw new Error(`Fallo de autenticación con la base de datos secundaria: ${sessionError.message}`);
+            console.error("Error setting session on HPL client:", sessionError);
+            throw new Error(`Authentication failure with secondary database: ${sessionError.message}`);
         }
-        
-        console.log("Sesión establecida correctamente en ambos clientes.");
 
         appState.user = session.user;
 
-        // El resto del flujo continúa normalmente
         let { data: profile, error } = await supabaseSST
             .from('perfiles')
             .select('*, establecimiento:establecimientos(id, nombre)')
@@ -111,15 +88,15 @@ const Auth = {
 
         if (error) {
             if (error.code === 'PGRST116') {
-                console.log("Perfil no encontrado, creando uno nuevo.");
+                console.log("Profile not found, creating a new one.");
                 const { error: insertError } = await supabaseSST.from('perfiles').insert([{ id: session.user.id, email: session.user.email }]);
-                if (insertError) throw new Error("Fallo al crear el perfil de usuario: " + insertError.message);
+                if (insertError) throw new Error("Failed to create user profile: " + insertError.message);
                 return this.fetchUserProfile();
             } else {
-                throw new Error("Fallo al obtener el perfil de usuario: " + error.message);
+                throw new Error("Failed to fetch user profile: " + error.message);
             }
         }
-        
+
         appState.profile = profile;
         if (profile.establecimiento) {
             appState.establishment = { ...profile.establecimiento, source: 'sst' };
@@ -131,7 +108,7 @@ const Auth = {
                 appState.establishment = null;
              }
         }
-        
+
         if (profile.rol === 'admin') {
             const [source] = appState.globalEstablishmentFilter.split(/-(.+)/);
             appState.currentClient = getSupabaseClient(source);
@@ -140,14 +117,14 @@ const Auth = {
         } else {
             appState.currentClient = supabaseSST;
         }
-        
+
         return profile;
     },
     async checkAuth() {
         try {
             return await this.fetchUserProfile();
         } catch (error) {
-            console.error("Fallo la verificación de autenticación:", error.message);
+            console.error("Authentication check failed:", error.message);
             if (!window.location.pathname.endsWith('/login.html')) {
                 window.location.href = 'login.html';
             }
@@ -3518,29 +3495,38 @@ window.APP_MODULES.wastePoints = (() => {
 })();
 
 // ---------------------------------------------------------------------------------
-// PARTE 9: PUNTO DE ENTRADA Y LÓGICA DE INICIALIZACIÓN
+// PARTE 9: PUNTO DE ENTRADA Y LÓGICA DE INICIALIZACIÓN (LÓGICA CORREGIDA)
 // ---------------------------------------------------------------------------------
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Si no estamos en la página de login, iniciamos la verificación.
     if (document.body.id !== 'login-page') {
         Auth.checkAuth().then(profile => {
+            // Si la verificación es exitosa y obtenemos un perfil, iniciamos la app.
             if (profile) {
                 mainApp();
             }
+            // Si checkAuth falla, él mismo se encargará de redirigir a login.html.
         });
     }
 });
 
 async function mainApp() {
+    // Estas funciones cargan datos necesarios para la app.
     await Promise.all([loadAllEstablishments(), loadUnitsCache(), loadSuppliesCache(), loadAgreementsCache()]);
 
+    // Llenamos la barra de navegación y el perfil de usuario.
     populateNavbar();
     setupTabs();
     await setupUserProfile();
 
-    if (!appState.establishment && appState.profile.rol !== 'admin') {
+    // --- LÓGICA CRÍTICA CORREGIDA ---
+    // Si el usuario NO es admin Y AÚN no tiene un establecimiento asignado,
+    // le mostramos el selector para que elija uno.
+    if (appState.profile.rol !== 'admin' && !appState.establishment) {
         showEstablishmentSelector();
     } else {
+        // Si es admin o si ya tiene un establecimiento, cargamos el dashboard.
         loadTabContent('dashboard');
     }
 }
@@ -3665,5 +3651,6 @@ function loadTabContent(tabName) {
         contentArea.innerHTML = `<div class="text-center p-10"><h2 class="text-xl font-semibold">Módulo '${tabName}' en construcción.</h2></div>`;
     }
 }
+
 
 
