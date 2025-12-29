@@ -4,60 +4,61 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Iniciar Sesión - Plataforma de Gestión</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Eliminamos dependencias remotas de Tailwind y Supabase para evitar problemas de CORS y tracking -->
+    <!-- Configuración de Supabase y constantes -->
+    <script src="config.js"></script>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
-<body id="login-page" class="bg-gray-100 flex items-center justify-center h-screen">
+<body id="login-page" class="login-container">
+    <!-- Contenedor de la tarjeta de inicio de sesión/registro -->
+    <div class="login-card">
+        <!-- Encabezado del formulario -->
+        <div class="login-header">
+            <img src="logo-hpl.png" alt="Logo" style="max-width: 100px; height: auto; margin: 0 auto 1rem auto; display:block;">
+            <h1 style="font-size:1.75rem; font-weight:700; margin:0;">Plataforma de Gestión</h1>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Gestión de Residuos y Recursos</p>
+        </div>
 
-    <div class="w-full max-w-md">
-        <div class="bg-white shadow-lg rounded-xl p-8">
-            <div class="text-center mb-8">
-                <img src="logo-hpl.png" alt="Logo" class="w-24 h-24 mx-auto mb-4">
-                <h1 class="text-3xl font-bold text-gray-800">Plataforma de Gestión</h1>
-                <p class="text-gray-500">Gestión de Residuos y Recursos</p>
-            </div>
-            
-            <div id="forms-container">
-                <!-- Formulario de Iniciar Sesión -->
-                <form id="login-form" class="space-y-6">
-                    <div>
-                        <label for="login-email" class="text-sm font-medium text-gray-700">Email</label>
-                        <input id="login-email" name="email" type="email" required class="form-input mt-1" placeholder="su@email.com">
-                    </div>
-                    <div>
-                        <label for="login-password" class="text-sm font-medium text-gray-700">Contraseña</label>
-                        <input id="login-password" name="password" type="password" required class="form-input mt-1" placeholder="••••••••">
-                    </div>
-                    <div>
-                        <button type="submit" class="btn btn-primary w-full">Iniciar Sesión</button>
-                    </div>
-                </form>
+        <div id="forms-container">
+            <!-- Formulario de Iniciar Sesión -->
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input id="login-email" name="email" type="email" required class="form-input" placeholder="su@email.com">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Contraseña</label>
+                    <input id="login-password" name="password" type="password" required class="form-input" placeholder="••••••••">
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-primary w-full">Iniciar Sesión</button>
+                </div>
+            </form>
 
-                <!-- Formulario de Registro (oculto) -->
-                <form id="signup-form" class="space-y-6 hidden">
-                    <div>
-                        <label for="signup-email" class="text-sm font-medium text-gray-700">Email</label>
-                        <input id="signup-email" name="email" type="email" required class="form-input mt-1" placeholder="su@email.com">
-                    </div>
-                    <div>
-                        <label for="signup-password" class="text-sm font-medium text-gray-700">Contraseña</label>
-                        <input id="signup-password" name="password" type="password" required class="form-input mt-1" placeholder="Mínimo 6 caracteres">
-                    </div>
-                    <div>
-                        <button type="submit" class="btn btn-primary w-full">Crear Cuenta</button>
-                    </div>
-                </form>
-            </div>
+            <!-- Formulario de Registro (oculto) -->
+            <form id="signup-form" class="hidden">
+                <div class="form-group">
+                    <label for="signup-email">Email</label>
+                    <input id="signup-email" name="email" type="email" required class="form-input" placeholder="su@email.com">
+                </div>
+                <div class="form-group">
+                    <label for="signup-password">Contraseña</label>
+                    <input id="signup-password" name="password" type="password" required class="form-input" placeholder="Mínimo 6 caracteres">
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-primary w-full">Crear Cuenta</button>
+                </div>
+            </form>
+        </div>
 
-            <div id="error-message" class="mt-4 text-center text-sm text-red-600 h-4"></div>
+        <!-- Mensaje de error dinámico -->
+        <div id="error-message" class="error-container" style="text-align:center;"></div>
 
-            <div class="mt-6 text-center">
-                <p id="toggle-text" class="text-sm text-gray-600">
-                    ¿No tienes una cuenta? <a href="#" id="toggle-link" class="font-medium text-indigo-600 hover:text-indigo-500">Regístrate aquí</a>
-                </p>
-            </div>
+        <div style="margin-top: 1.5rem; text-align:center;">
+            <p id="toggle-text" style="font-size:0.875rem; color: var(--text-secondary);">
+                ¿No tienes una cuenta? <a href="#" id="toggle-link" style="font-weight:600; color: var(--primary-color); text-decoration:none;">Regístrate aquí</a>
+            </p>
         </div>
     </div>
     

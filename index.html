@@ -15,8 +15,10 @@
     <!-- Tailwind CSS: Framework para diseño rápido de interfaces. -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Supabase: Cliente de JavaScript para interactuar con la base de datos y autenticación. -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Eliminamos la dependencia del SDK de Supabase: la aplicación utiliza una
+         implementación personalizada en app.js y las credenciales se cargan
+         desde config.js. -->
+    <script src="config.js"></script>
     
     <!-- Chart.js: Biblioteca para la creación de gráficos y visualizaciones de datos. -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
