@@ -251,7 +251,10 @@ async function supabaseRequest(clientKey, endpoint, method = 'GET', body = null,
         let message = response.statusText;
         try {
             const errorData = await response.json();
-            message = errorData.error?.description || errorData.error || errorData.message || message;
+            // Supabase puede devolver diferentes campos de error:
+            // error_description en el endpoint de auth, error.description en otras rutas,
+            // error en rutas REST, o message en respuesta genérica
+            message = errorData.error_description || errorData.error?.description || errorData.error || errorData.message || message;
         } catch (e) {
             // ignorar si no es JSON
         }
